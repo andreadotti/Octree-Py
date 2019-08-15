@@ -21,7 +21,6 @@ class Point3D():
         else:
             return Point3D(self.x * value, self.y * value, self.z * value)
 
-
     def __truediv__(self, value):
         if type(value) == Point3D:
             raise NotImplementedError()
@@ -32,5 +31,8 @@ class Point3D():
         'Return a nicely formatted representation string'
         return self.__class__.__name__ + '(x='+str(self.x)+', y='+str(self.y)+', z='+str(self.z)+')'
 
+    def __str__(self):
+        return f"{self.x},{self.y},{self.z}"
+    
     def dist(self, point):
         return sqrt(self.x**2 + self.y**2 + self.z**2)
