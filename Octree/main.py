@@ -1,14 +1,18 @@
-from Octree import *
-from Point import Point3D
+from Octree import Octree
+import numpy as np
+#from Point import Point3D
 
-from random import random
 
 print("TESTME")
-ot = Octree(Point3D(0, 0, 0), Point3D(1, 1, 1), max_levels=2)
+ot = Octree(
+    lower_bound=np.array([0, 0, 0],dtype=float), 
+    upper_bound=np.array([1, 1, 1],dtype=float),
+    max_levels=2,
+    initial_points = np.random.random((1000,3))
+)
 
 
-for i in range(10000):
-    ot.addPoint(Point3D(random(), random(), random()))
+
 
 def printInfo(node, ctr=0):
     print(f"Node: {ctr}")
@@ -37,7 +41,7 @@ print(f"Center points: {cts}")
 
 #Test
 for i in range(1000):
-    point = Point3D(random(),random(),random())
+    point = np.random.random(3) 
     assert ot.check_point_contained(point)
     cell = ot.find_cell(point)
     #print(
