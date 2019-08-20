@@ -2,8 +2,9 @@ from collections import namedtuple
 #TODO: Remove Point3D class
 #TODO: make it work for 2D
 #from Point import Point3D
-from typing import List
+from typing import List, Optional
 import numpy as np
+from collections import Counter
 
 #TODO: remove the hard-coded limitation of 3 dimensions
 def index2mask(idx: int):
@@ -46,11 +47,9 @@ class Octree():
         self.cardinality = 2**dim
         assert(self.cardinality == 8)#To remove this constrain
         self.dimensions = lower_bound.shape[0]
-        self.__feature_point = None
-        #print(initial_points.shape)
+        self.__feature_point: Optional[np.ndarray] = None
         for p in initial_points:
             self.addPoint(p)
-        # map(lambda p: self.addPoint(p), initial_points)
 
     @property
     def feature_point(self):
@@ -58,7 +57,7 @@ class Octree():
             self.__feature_point = np.mean(self.points)
         return self.__feature_point
 
-    def extend(self):
+    def extend(self) -> bool:
         if (self.max_levels == 0):
             return False
         else:
@@ -76,7 +75,7 @@ class Octree():
         new_upper_bound = self.center*imask + self.upper_bound*mask
         return Octree(new_lower_bound, new_upper_bound, self.max_levels - 1, self.max_size)
 
-    def addPoint(self, pt: np.array):
+    def addPoint(self, pt: np.ndarray):
         if self.has_children:
             self._addPointToChild(pt)
         elif len(self.points) >= self.max_size:
@@ -88,7 +87,7 @@ class Octree():
             self.points = np.vstack((self.points,pt))
         self.numPoints += 1
        
-    def _addPointToChild(self, pt: np.array):
+    def _addPointToChild(self, pt: np.ndarray):
         self.children[self._get_index(pt)].addPoint(pt)
 
     def _get_index(self, pt):
@@ -98,22 +97,22 @@ class Octree():
         z = int(pt[2] >= self.center[2])
         return (mask2index((x,y,z)))
 
-    def is_boundary_cell(self):
+    def is_boundary_cell(self) -> bool:
         return self.points.shape[0]>0
 
     @property
-    def boundary_cells(self):
+    def boundary_cells(self) -> List[Octree]:
         """List of boundary cells (e.g. non-empty)"""
         _bdr = [ self ] if self.is_boundary_cell() else []
         for _cell in self.children:
             _bdr += _cell.boundary_cells
         return _bdr
 
-    def check_point_contained(self, point: np.array):
+    def check_point_contained(self, point: np.array) -> bool:
         """Check if point is contained in cell"""
         return np.all(self.lower_bound<point) and np.all(point<self.upper_bound)        
 
-    def find_cell(self, point):
+    def find_cell(self, point: np.ndarray) -> Octree:
         """Find cell cotaining point"""
         #print(self.center)
         if self.has_children:
