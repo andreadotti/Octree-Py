@@ -124,3 +124,37 @@ class Octree():
             #This fails only if point is outside of octree
             assert self.check_point_contained(point)
             return self
+
+    def sample(self, k: int = 1 ) -> np.ndarray:
+        """Sample k points from octree
+
+        Sample points from octree with probabilities proportation
+        to the boundary cells points density
+
+        :return: np.ndarray.shape[k,self.points.shape[1]]
+        """
+        # Step 1. Sort by number of points in (boundary) cell
+        _bcd = { bc: len(bc.points) for bc in self.boundary_cells}
+        _sorted = sorted(_bcd.items(), key=lambda e: e[1])
+        # Step 2. Select k points at random. First select at 
+        # random the boundary cell with a probability proportional
+        # to the number of points in it
+        _bcs, _density = zip(*_sorted) #Unzip
+        # Build a segment from 0 to total cumulative sum
+        # ex.: density = [10,5,2] -> [10,15,17], so arandom number 
+        #      of 13 falls in the second binm: index=1
+        #Now 
+        _ss = np.cumsum(_density) 
+        #k random numbers [0,tot+1)
+        _kps = np.random.randint(0,_ss[-1]+1,size=k)
+        #This is the list of indexes where the random points would
+        #fall e.g. such that _kps <= _ss[_indexes]
+        _indexes = np.searchsorted(_ss, _kps)
+        #Get the corresponding 
+        _selected = np.array(_bcs)[_indexes]
+        #Deal with the case when the same boundary cell is selected more than once
+        #Needed because we want to get random numbers with replacement with 
+        #associated points
+        _dd = Counter(_selected) # { obj : cardinality }
+        #For each selected boundary cell, extract one random 
+        return np.vstack([ np.random.choice(bc.points.shape[0], card, replace=False) for bc,card in _dd.items() ])
