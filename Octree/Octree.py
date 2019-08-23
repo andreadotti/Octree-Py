@@ -50,11 +50,12 @@ class Octree():
         self.__feature_point: Optional[np.ndarray] = None
         for p in initial_points:
             self.addPoint(p)
+        self.__sample_cache = None
 
     @property
     def feature_point(self):
         if len(self.points):
-            self.__feature_point = np.mean(self.points)
+            self.__feature_point = np.mean(self.points,axis=0)
         return self.__feature_point
 
     def extend(self) -> bool:
@@ -86,6 +87,7 @@ class Octree():
         else:
             self.points = np.vstack((self.points,pt))
         self.numPoints += 1
+        self.__sample_cache = None
        
     def _addPointToChild(self, pt: np.ndarray):
         self.children[self._get_index(pt)].addPoint(pt)
@@ -101,7 +103,7 @@ class Octree():
         return self.points.shape[0]>0
 
     @property
-    def boundary_cells(self) -> List[Octree]:
+    def boundary_cells(self) -> List['Octree']:
         """List of boundary cells (e.g. non-empty)"""
         _bdr = [ self ] if self.is_boundary_cell() else []
         for _cell in self.children:
@@ -112,7 +114,7 @@ class Octree():
         """Check if point is contained in cell"""
         return np.all(self.lower_bound<point) and np.all(point<self.upper_bound)        
 
-    def find_cell(self, point: np.ndarray) -> Octree:
+    def find_cell(self, point: np.ndarray) -> 'Octree':
         """Find cell cotaining point"""
         #print(self.center)
         if self.has_children:
@@ -132,19 +134,24 @@ class Octree():
 
         :return: np.ndarray.shape[k,self.points.shape[1]]
         """
-        # Step 1. Sort by number of points in (boundary) cell
-        _bcd = { bc: len(bc.points) for bc in self.boundary_cells}
-        _sorted = sorted(_bcd.items(), key=lambda e: e[1])
-        # Step 2. Select k points at random. First select at 
-        # random the boundary cell with a probability proportional
-        # to the number of points in it
-        _bcs, _density = zip(*_sorted) #Unzip
-        # Build a segment from 0 to total cumulative sum
-        # ex.: density = [10,5,2] -> [10,15,17], so arandom number 
-        #      of 13 falls in the second binm: index=1
-        #Now 
-        _ss = np.cumsum(_density) 
+        if self.__sample_cache is None:
+            # Step 1. Sort by number of points in (boundary) cell
+            _bcd = { bc: len(bc.points) for bc in self.boundary_cells}
+            _bcd = { k:v for k,v in _bcd.items() if v>50 }
+            _sorted = sorted(_bcd.items(), key=lambda e: e[1], reverse=True)
+            # Step 2. Select k points at random. First select at 
+            # random the boundary cell with a probability proportional
+            # to the number of points in it
+            _bcs, _density = zip(*_sorted) #Unzip
+            # Build a segment from 0 to total cumulative sum
+            # ex.: density = [10,5,2] -> [10,15,17], so arandom number 
+            #      of 13 falls in the second binm: index=1
+            #Now 
+            _ss = np.cumsum(_density) 
+            self.__sample_cache = {'ss' : _ss, 'bcs' : _bcs}
         #k random numbers [0,tot+1)
+        _ss = self.__sample_cache['ss']
+        _bcs= self.__sample_cache['bcs']
         _kps = np.random.randint(0,_ss[-1]+1,size=k)
         #This is the list of indexes where the random points would
         #fall e.g. such that _kps <= _ss[_indexes]
@@ -156,4 +163,10 @@ class Octree():
         #associated points
         _dd = Counter(_selected) # { obj : cardinality }
         #For each selected boundary cell, extract one random 
-        return np.vstack([ np.random.choice(bc.points.shape[0], card, replace=False) for bc,card in _dd.items() ])
+        #To return `card` random rows of a Nx3 array a; first, get `card` integers in [0,a.shape[0]] then
+        # a[rnd,:] will return a `card`x3 array, stack all of them
+        return  np.vstack([ bc.points[np.random.choice(bc.points.shape[0], size=card, replace=False),:] for bc,card in _dd.items() ]), _dd.keys()
+
+    def all_feature_points(self):
+        """Returns all feature points"""
+        return np.vstack([ bc.feature_point for bc in self.boundary_cells])
